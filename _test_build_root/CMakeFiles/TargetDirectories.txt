@@ -1,0 +1,7 @@
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/CMakeFiles/FreeRTOS_project.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/CMakeFiles/edit_cache.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/CMakeFiles/rebuild_cache.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/cmake/stm32cubemx/CMakeFiles/FreeRTOS.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+C:/Users/1/Desktop/lixin_tingke/FreeRTOS_project/_test_build_root/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir
