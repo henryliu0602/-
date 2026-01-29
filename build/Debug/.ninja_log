@@ -61,3 +61,7 @@
 256	480	7911329448040007	FreeRTOS_project.elf	9f22dbf878b8c842
 4	231	7911330498674535	CMakeFiles/FreeRTOS_project.dir/Core/Src/main.c.obj	9faae1abff4e7ac7
 232	410	7911330500419366	FreeRTOS_project.elf	9f22dbf878b8c842
+5	403	7911378000181466	CMakeFiles/FreeRTOS_project.dir/Core/Src/main.c.obj	9faae1abff4e7ac7
+404	665	7911378002756994	FreeRTOS_project.elf	9f22dbf878b8c842
+4	244	7911384948835032	CMakeFiles/FreeRTOS_project.dir/Core/Src/main.c.obj	9faae1abff4e7ac7
+244	468	7911384951029075	FreeRTOS_project.elf	9f22dbf878b8c842
