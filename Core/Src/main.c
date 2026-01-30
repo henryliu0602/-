@@ -27,12 +27,13 @@
 #include "stdio.h"
 #include <unistd.h>
 #include "queue.h"       // cubemx 队列的头文件
+#include "semphr.h"      // 信号量 的头文件
 #include "my_freertos.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define MAX_RESOURCE 3        //   定义计数信号量最大值
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -44,6 +45,10 @@ TaskHandle_t SenderHandle_1,SenderHandle_2, SenderHandle1 , SenderHandle2 , Rece
 QueueHandle_t queue_handle;
 xQueueHandle xQueue1 ,xQueue2 ;               //  创建两个队列的句柄
 xQueueSetHandle xQueueSet ;                   //  创建队列集合   使用队列集合需要先在FreeRTOSConfig.h 中定义宏 configUSE_QUEUE_SETS 并将其赋值为 1
+
+xSemaphoreHandle  xSemaphore ;                //  创建计数信号量 句柄
+SemaphoreHandle_t xBinarySemaphore ;          //  创建信号量 句柄
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,6 +68,7 @@ void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 uint32_t a ,b,c ,d,e,value1,value2;
 uint8_t flag=0;
+int sharedCounter = 0 ;
 void vTask2(void *pvParameters) ;
 void vTask3(void *pvParameters) ;
 /* USER CODE END PFP */
@@ -72,6 +78,10 @@ void vTask3(void *pvParameters) ;
 const char * s1 = "task1 controller running..." ;
 const char * s2 = "task2 controller running..." ;
 const char * s3 = "task3 controller running..." ;
+
+// 定义三个全局变量
+uint32_t redLedProfile = 0, blueLedProfile = 0, greenLedProfile = 0;
+SemaphoreHandle_t xMutex ;      //  定义一个互斥量
 
 uint32_t priority ;
 
@@ -236,6 +246,100 @@ void ReceiveTask_1(void *pvParameters) {
   }
 }
 
+//  二值信号量任务
+void redLedControllerTask(void *pvParameters) {
+    xSemaphoreGive(xBinarySemaphore);                            //  首先 先放置一个信号量
+  while(1) {
+    xSemaphoreTake(xBinarySemaphore,portMAX_DELAY);              //  获取句柄为 xBinarySemaphore 的信号量
+    printf("redLedControllerTask running ...\r\n");
+    ++redLedProfile ;
+    xSemaphoreGive(xBinarySemaphore);                            //  释放信号量
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+void blueLedControllerTask(void *pvParameters) {
+  while(1) {
+    xSemaphoreTake(xBinarySemaphore,portMAX_DELAY);              //  获取句柄为 xBinarySemaphore 的信号量
+    printf("blueLedControllerTask running ...\r\n");
+    ++blueLedProfile ;
+    xSemaphoreGive(xBinarySemaphore);                            //  释放信号量
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+void greenLedControllerTask(void *pvParameters) {                //  获取句柄为 xBinarySemaphore 的信号量
+  while(1) {
+    xSemaphoreTake(xBinarySemaphore,portMAX_DELAY);
+    printf("greenLedControllerTask running ...\r\n");
+    ++greenLedProfile ;
+    xSemaphoreGive(xBinarySemaphore);                            //  释放信号量
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+//  互斥信号量任务
+//  在使用上 互斥信号量创建好之后，长度为 1。大小为 0 的队列中是有值的，直接获取就行了; 用于保护任务的共享资源，支持优先级反转避免死锁
+// 但是二值信号量的创建函数创建完之后，队列中是空的,需要先放后取。用于任务间的简单同步
+void Task1(void *pvParameters) {
+  while(1) {
+    if (xSemaphoreTake(xMutex,portMAX_DELAY) == pdTRUE)         //  如果任务获取到互斥信号量
+    {
+      sharedCounter ++ ;
+      printf("Task1:sharedCounter = %d\r\n",sharedCounter);
+      xSemaphoreGive(xMutex);                                   //  释放信号量
+    }
+      vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+void Task2(void *pvParameters) {
+  while(1) {
+    if (xSemaphoreTake(xMutex,portMAX_DELAY) == pdTRUE)         //  如果任务获取到互斥信号量
+    {
+      sharedCounter ++ ;
+      printf("Task2:sharedCounter = %d\r\n",sharedCounter);
+      xSemaphoreGive(xMutex);                                   //  释放信号量
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+void Task3(void *pvParameters) {
+  while(1) {
+    if (xSemaphoreTake(xMutex,portMAX_DELAY) == pdTRUE)         //  如果任务获取到互斥信号量
+    {
+      sharedCounter ++ ;
+      printf("Task3:sharedCounter = %d\r\n",sharedCounter);
+      xSemaphoreGive(xMutex);                                   //  释放信号量
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+//  计数信号量任务
+void vTaskFunction(void *pvParameters) {
+  char *taskID = (char *)pvParameters;
+  while(1) {
+    printf(" 任务 %s 请求资源\r\n",taskID);
+    fflush(stdout) ;                        //  加一句 c++的代码，用于清空输出缓冲区
+    if ( xSemaphoreTake(xSemaphore,0) == pdTRUE) {              //   用的和互斥信号量是同一个函数  如果获取成功
+      printf("任务 %s 获取资源，当前资源剩余 %d\r\n", taskID, (uint32_t) uxSemaphoreGetCount(xSemaphore));   // 用uxSemaphoreGetCount函数 获取剩余信号量
+     fflush(stdout) ;
+      for (int i = 0; i < 10000000 ; i++){}
+      printf("任务 %s 使用完资源，当前资源剩余 %d\r\n", taskID, (uint32_t) uxSemaphoreGetCount(xSemaphore));   // 用uxSemaphoreGetCount函数 获取剩余信号量
+     fflush(stdout) ;
+      xSemaphoreGive(xSemaphore);
+    }
+    else {
+      printf("任务 %s 无法获取资源，资源池为空\r\n", taskID);
+     fflush(stdout) ;
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -289,11 +393,34 @@ int main(void)
 //  xTaskCreate(SenderTask,"Sender_2",512,(void *)&(xStructsToSend[1]),2,&SenderHandle_2);
 //  xTaskCreate(ReceiverTask,"Receiver",1024,NULL,2,&ReceiverHandle);
 
-    xTaskCreate(SenderTask_1,"sender1",512,NULL,1,NULL);
-    xTaskCreate(SenderTask_2,"sender2",512,NULL,1,NULL);
-    xTaskCreate(ReceiveTask_1,"receiver",1024,NULL,2,NULL);
+//  xTaskCreate(SenderTask_1,"sender1",512,NULL,1,NULL);
+//  xTaskCreate(SenderTask_2,"sender2",512,NULL,1,NULL);
+//  xTaskCreate(ReceiveTask_1,"receiver",1024,NULL,2,NULL);
 
-    vTaskStartScheduler();
+//    xBinarySemaphore = xSemaphoreCreateBinary() ;               //  创建二值信号量 返回给二值信号量的句柄
+
+//   xTaskCreate(redLedControllerTask,"redLedTask" , 512,NULL,1,NULL) ;
+//    xTaskCreate(blueLedControllerTask,"blueLedTask" , 512,NULL,1,NULL) ;
+//    xTaskCreate(greenLedControllerTask,"greenLedTask" , 512,NULL,1,NULL) ;
+
+//  xMutex = xSemaphoreCreateMutex();                              //  创建 互斥信号量 返回给互斥信号量的句柄
+//  xTaskCreate(Task1,"Task1" , 512,NULL,1,NULL) ;
+// xTaskCreate(Task2,"Task2" , 512,NULL,1,NULL) ;
+// xTaskCreate(Task3,"Task3" , 512,NULL,1,NULL) ;
+
+  xSemaphore = xSemaphoreCreateCounting(MAX_RESOURCE,MAX_RESOURCE);   //  创建  计数信号量 返回给计数信号量的句柄。两个参数分别为 最大信号量 和 初始信号量
+  if (xSemaphore == NULL) {
+    printf("创建信号量失败\r\n") ;
+    return 0 ;
+  }
+  xTaskCreate(vTaskFunction,"TaskFunction_0",1024,"0",1,NULL);
+  xTaskCreate(vTaskFunction,"TaskFunction_1",1024,"1",1,NULL);
+  xTaskCreate(vTaskFunction,"TaskFunction_2",1024,"2",1,NULL);
+  xTaskCreate(vTaskFunction,"TaskFunction_3",1024,"3",1,NULL);
+  xTaskCreate(vTaskFunction,"TaskFunction_4",1024,"4",1,NULL);
+  xTaskCreate(vTaskFunction,"TaskFunction_5",1024,"5",1,NULL);
+
+  vTaskStartScheduler();
 
   /* USER CODE END 2 */
 
